@@ -1,0 +1,50 @@
+<mujoco>
+  <compiler autolimits="true"/>
+
+  <asset>
+    <!-- 地面棋盘格 -->
+    <texture name="grid" type="2d" builtin="checker"
+             width="512" height="512"
+             rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
+    <material name="grid" texture="grid" texrepeat="8 8" texuniform="true"/>
+
+    <texture name="skybox" type="skybox"
+             builtin="gradient"
+             width="512" height="512"
+             rgb1="0.4 0.6 0.8"
+             rgb2="0.1 0.2 0.3"/>
+  </asset>
+
+  <default>
+    <geom conaffinity="1" contype="1" condim="3" rgba="0.8 0.2 0.2 1"/>
+    <joint damping="0.1"/>
+  </default>
+
+  <worldbody>
+    <geom name="floor" type="plane" size="5 5 0.1"
+          rgba="0.3 0.7 0.3 1" material="grid"/>
+
+    <!-- 橙色圆柱体机器人 -->
+    <body name="robot" pos="0 0 0.1">
+      <joint name="tx" type="slide" axis="1 0 0"/>
+      <joint name="ty" type="slide" axis="0 1 0"/>
+      <joint name="rz" type="hinge" axis="0 0 1"/>
+
+      <geom name="robot_body" type="cylinder"
+            size="0.15 0.1"
+            rgba="0.9 0.5 0.1 1"/>
+
+      <site name="robot_front"
+            pos="0.15 0 0"
+            size="0.02"
+            rgba="1 1 0 1"/>
+    </body>
+  </worldbody>
+
+  <!-- 速度控制器 -->
+  <actuator>
+    <velocity name="vx" joint="tx" ctrlrange="-1 1" kv="200"/>
+    <velocity name="vy" joint="ty" ctrlrange="-1 1" kv="200"/>
+    <velocity name="wz" joint="rz" ctrlrange="-2 2" kv="50"/>
+  </actuator>
+</mujoco>
