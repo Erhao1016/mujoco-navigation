@@ -39,12 +39,30 @@
             size="0.02"
             rgba="1 1 0 1"/>
     </body>
+
+    <!-- 障碍物1 红色 -->
+    <body name="obs_test" pos="0.7 0 0.15">
+      <geom type="box" size="0.3 0.3 0.1" rgba="1 0 0 1"/>
+    </body>
+    <!-- 障碍物2 蓝色 -->
+    <body name="obs_2" pos="0.3 0.8 0.15">
+      <geom type="box" size="0.25 0.25 0.1" rgba="0 0 1 1"/>
+    </body>
+    <!-- 障碍物3 绿色 -->
+    <body name="obs_3" pos="0.4 -0.7 0.15">
+      <geom type="box" size="0.2 0.2 0.1" rgba="0 1 0 1"/>
+    </body>
+    <!-- 障碍物4 紫色 -->
+    <body name="obs_4" pos="-0.6 0.2 0.15">
+      <geom type="box" size="0.3 0.2 0.1" rgba="1 0 1 1"/>
+    </body>
+
   </worldbody>
 
   <!-- 速度控制器 -->
   <actuator>
     <velocity name="vx" joint="tx" ctrlrange="-1 1" kv="200"/>
-    <velocity name="vy" joint="ty" ctrlrange="-1 1" kv="200"/>
+    <velocity name="vy" joint="ty" ctrlrange="-1 1" kv="50"/>
     <velocity name="wz" joint="rz" ctrlrange="-2 2" kv="50"/>
   </actuator>
 </mujoco>
