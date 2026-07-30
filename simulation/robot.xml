@@ -1,0 +1,86 @@
+<mujoco>
+
+    <compiler autolimits="true"/>
+
+
+    <default>
+        <joint damping="0.1"/>
+        <geom contype="1"
+              conaffinity="1"/>
+    </default>
+
+
+    <worldbody>
+
+        <!-- robot -->
+
+        <body name="robot"
+              pos="0 0 0.15">
+
+
+            <!-- X -->
+            <joint name="tx"
+                   type="slide"
+                   axis="1 0 0"/>
+
+
+            <!-- Y -->
+            <joint name="ty"
+                   type="slide"
+                   axis="0 1 0"/>
+
+
+            <!-- rotation -->
+            <joint name="rz"
+                   type="hinge"
+                   axis="0 0 1"/>
+
+
+            <geom
+                name="robot_body"
+                type="cylinder"
+                size="0.15 0.1"
+                rgba="0.9 0.5 0.1 1"/>
+
+
+            <site
+                name="front"
+                pos="0.15 0 0"
+                size="0.03"/>
+
+
+        </body>
+
+
+    </worldbody>
+
+
+
+    <actuator>
+
+
+        <velocity
+            name="vx"
+            joint="tx"
+            ctrlrange="-1 1"
+            kv="200"/>
+
+
+        <velocity
+            name="vy"
+            joint="ty"
+            ctrlrange="-1 1"
+            kv="50"/>
+
+
+        <velocity
+            name="wz"
+            joint="rz"
+            ctrlrange="-2 2"
+            kv="50"/>
+
+
+    </actuator>
+
+
+</mujoco>
