@@ -1,0 +1,123 @@
+<mujoco model="navigation_world">
+
+    <compiler autolimits="true"/>
+
+
+    <!-- 引入机器人 -->
+    <include file="robot.xml"/>
+
+
+
+    <asset>
+
+        <!-- 地面纹理 -->
+        <texture 
+            name="grid"
+            type="2d"
+            builtin="checker"
+            width="512"
+            height="512"
+            rgb1=".15 .15 .15"
+            rgb2=".25 .25 .25"/>
+
+
+        <material
+            name="ground"
+            texture="grid"
+            texrepeat="10 10"/>
+
+
+        <!-- 天空 -->
+        <texture 
+            name="sky"
+            type="skybox"
+            builtin="gradient"
+            width="256"
+            rgb1="0.4 0.6 0.8"
+            rgb2="0.1 0.2 0.3"/>
+
+
+    </asset>
+
+
+
+    <worldbody>
+
+
+        <!-- 地面 -->
+
+        <geom
+            name="floor"
+            type="plane"
+            size="5 5 0.1"
+            material="ground"/>
+
+
+
+        <!-- 障碍物1 -->
+
+        <body
+            name="obstacle_red"
+            pos="1 0 0.25">
+
+            <geom
+                name="box1"
+                type="box"
+                size="0.3 0.3 0.25"
+                rgba="1 0 0 1"/>
+
+        </body>
+
+
+
+        <!-- 障碍物2 -->
+
+        <body
+            name="obstacle_blue"
+            pos="0.5 1 0.25">
+
+            <geom
+                name="box2"
+                type="box"
+                size="0.25 0.25 0.25"
+                rgba="0 0 1 1"/>
+
+        </body>
+
+
+
+        <!-- 障碍物3 -->
+
+        <body
+            name="obstacle_green"
+            pos="0.5 -1 0.25">
+
+            <geom
+                name="box3"
+                type="box"
+                size="0.2 0.2 0.25"
+                rgba="0 1 0 1"/>
+
+        </body>
+
+
+
+        <!-- 障碍物4 -->
+
+        <body
+            name="obstacle_purple"
+            pos="-1 0.5 0.25">
+
+            <geom
+                name="box4"
+                type="box"
+                size="0.3 0.2 0.25"
+                rgba="1 0 1 1"/>
+
+        </body>
+
+
+    </worldbody>
+
+
+</mujoco>
