@@ -1,6 +1,7 @@
 import heapq
 import math
 import numpy as np
+import random
 
 #欧氏距离
 def heuristic(a, b):
@@ -61,9 +62,24 @@ def astar(grid, start, goal):
     return None  # 无解
 
 
-def plan_from_corner(grid):
+def plan_random_start_goal(grid):
+    """
+    随机选取起点和终点（必须在可通行区域）
+    """
     height, width = grid.shape
-    start = (height - 1, 0)      # 左下角
-    goal = (0, width - 1)         # 右上角
+    
+    # 找出所有可通行的点
+    free_cells = np.argwhere(grid == 255)
+    
+    if len(free_cells) < 2:
+        return None
 
+    # 随机选两个不同的点
+    idx1, idx2 = random.sample(range(len(free_cells)), 2)
+    start = tuple(free_cells[idx1])
+    goal = tuple(free_cells[idx2])
+    
+    print(f"Random Start (pixel): {start}")
+    print(f"Random Goal  (pixel): {goal}")
+    
     return astar(grid, start, goal)

@@ -10,8 +10,7 @@ import os
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-from planner.astar_planner import plan_from_corner
-
+from planner.astar_planner import plan_random_start_goal
 
 # =====================================
 # 路径
@@ -92,7 +91,7 @@ RESOLUTION = (
     MAP_SIZE
 )
 
-
+ROBOT_RADIUS = 0.15
 
 # 空闲区域
 # 白色
@@ -139,64 +138,51 @@ def world_to_pixel(x, y):
 # 绘制障碍物
 # =====================================
 
-
-def add_obstacle(
-        x,
-        y,
-        size_x,
-        size_y
-):
-
-
+def add_obstacle(x, y, size_x, size_y):
     xmin = x - size_x
     xmax = x + size_x
-
     ymin = y - size_y
     ymax = y + size_y
 
+    px1, py1 = world_to_pixel(xmin, ymin)
+    px2, py2 = world_to_pixel(xmax, ymax)
+
+    px1 = max(0, px1)
+    py1 = max(0, py1)
+    px2 = min(MAP_SIZE - 1, px2)
+    py2 = min(MAP_SIZE - 1, py2)
+
+    grid[py1:py2, px1:px2] = 0
 
 
-    px1, py1 = world_to_pixel(
-        xmin,
-        ymin
-    )
+# =====================================
+# 障碍物膨胀（考虑机器人体积）
+# =====================================
 
+def inflate_obstacles(grid, radius_px):
+    """
+    将障碍物膨胀 radius_px 个像素
+    """
+    y, x = np.ogrid[-radius_px:radius_px+1, -radius_px:radius_px+1]
+    kernel = x*x + y*y <= radius_px*radius_px
 
-    px2, py2 = world_to_pixel(
-        xmax,
-        ymax
-    )
+    inflated_grid = grid.copy()
+    obstacle_pixels = np.where(grid == 0)
 
+    for r, c in zip(obstacle_pixels[0], obstacle_pixels[1]):
+        r_min = max(0, r - radius_px)
+        r_max = min(MAP_SIZE, r + radius_px + 1)
+        c_min = max(0, c - radius_px)
+        c_max = min(MAP_SIZE, c + radius_px + 1)
 
+        inflated_grid[r_min:r_max, c_min:c_max][
+            kernel[
+                r_min - r + radius_px : r_max - r + radius_px,
+                c_min - c + radius_px : c_max - c + radius_px
+            ]
+        ] = 0
 
-    px1 = max(
-        0,
-        px1
-    )
-
-    py1 = max(
-        0,
-        py1
-    )
-
-
-    px2 = min(
-        MAP_SIZE-1,
-        px2
-    )
-
-
-    py2 = min(
-        MAP_SIZE-1,
-        py2
-    )
-
-
-
-    grid[
-        py1:py2,
-        px1:px2
-    ] = 0
+    return inflated_grid
 
 
 
@@ -307,11 +293,19 @@ pgm_path = os.path.join(
 # =====================================
 # A* Path Planning
 # =====================================
+# =====================================
+# 障碍物膨胀
+# =====================================
+
+robot_radius_px = int(ROBOT_RADIUS / RESOLUTION)
+print(f"\nInflating obstacles by {robot_radius_px} pixels (robot radius: {ROBOT_RADIUS}m)...")
+
+grid = inflate_obstacles(grid, robot_radius_px)
+print("Inflation finished.")
 
 print("\n===== A* Path Planning =====")
 
-path = plan_from_corner(grid)
-
+path = plan_random_start_goal(grid)
 if path is None:
     print("No valid path found!")
 else:
