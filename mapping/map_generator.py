@@ -4,6 +4,13 @@ from PIL import Image
 import yaml
 import os
 
+#引入A*算法
+import sys
+import os
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from planner.astar_planner import plan_from_corner
 
 
 # =====================================
@@ -297,12 +304,34 @@ pgm_path = os.path.join(
 )
 
 
+# =====================================
+# A* Path Planning
+# =====================================
 
-Image.fromarray(
-    grid
-).save(
-    pgm_path
-)
+print("\n===== A* Path Planning =====")
+
+path = plan_from_corner(grid)
+
+if path is None:
+    print("No valid path found!")
+else:
+    print(f"Path found! Length: {len(path)} steps")
+
+    # Draw path into grid
+    PATH_COLOR = 128
+
+    for r, c in path:
+        if grid[r, c] == 255:  # Only draw on free space
+            grid[r, c] = PATH_COLOR
+
+    # Mark start and goal
+    sr, sc = path[0]
+    gr, gc = path[-1]
+    grid[sr, sc] = 200  # Start
+    grid[gr, gc] = 50   # Goal
+
+print("===== Path planning finished =====\n")
+Image.fromarray(grid).save(pgm_path)
 
 
 
