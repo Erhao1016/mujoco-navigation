@@ -1,0 +1,34 @@
+version: '3'
+services:
+  mujoco_sim:
+    build: ./simulation_docker
+    container_name: mujoco_simulation
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=5
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./simulation:/workspace/simulation
+      - ./maps:/workspace/maps
+    networks:
+      - ros_network
+    ipc: host
+
+  navigation:
+    build: ./navigation_docker
+    container_name: navigation_stack
+    environment:
+      - ROS_DOMAIN_ID=5
+    volumes:
+      - ./planner:/workspace/planner
+      - ./controller:/workspace/controller
+      - ./maps:/workspace/maps
+    depends_on:
+      - mujoco_sim
+    networks:
+      - ros_network
+
+networks:
+  ros_network:
+    driver: bridge
