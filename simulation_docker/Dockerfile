@@ -1,0 +1,19 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DISTRO=jazzy
+ENV ROS_DOMAIN_ID=5
+
+RUN apt update && apt install -y \
+    curl \
+    software-properties-common \
+    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list \
+    && apt update \
+    && apt install -y ros-${ROS_DISTRO}-desktop ros-dev-tools \
+    && apt install -y libgl1-mesa-glx libglib2.0-0 libsm6 libice6 libxrender1 libxkbcommon-x11-0 libdbus-1-3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
+
+WORKDIR /workspace
