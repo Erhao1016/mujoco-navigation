@@ -1,0 +1,27 @@
+# map_generator.py — 地图生成 + 路径规划
+
+## 用途
+从 MuJoCo 场景读取障碍物，生成栅格地图，并运行 A* 规划路径。
+
+## 运行
+bash
+cd mapping && python3 map_generator.py
+
+## 流程
+1. 加载 `world.xml`
+2. 提取障碍物位置（跳过地面和机器人）
+3. 绘制 400×400 栅格地图
+4. 根据机器人半径（0.15m）膨胀障碍物
+5. 随机选点，A* 规划路径
+6. 保存为 `maps/terrain_map.pgm` 和 `maps/terrain_map.yaml`
+
+## 关键参数
+| 参数 | 值 | 说明 |
+|------|----|------|
+| MAP_SIZE | 400 | 像素数 |
+| RESOLUTION | 0.025 m/px | 分辨率 |
+| ROBOT_RADIUS | 0.15 m | 膨胀半径 |
+
+## 常见问题
+**Q: 障碍物位置偏移？**  
+A: 检查 `world.xml` 中障碍物的 `pos`，`map_generator.py` 使用 `data.xpos` 读取世界坐标。

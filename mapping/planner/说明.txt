@@ -1,0 +1,21 @@
+# astar_planner.py — A* 路径规划
+
+## 用途
+在栅格地图上找到从起点到终点的最短路径。
+
+## 核心函数
+- `heuristic(a, b)`：欧几里得距离
+- `astar(grid, start, goal)`：返回路径点列表，无解返回 None
+- `plan_random_start_goal(grid)`：随机选起终点并规划
+
+## 算法原理
+A* 每次选择“离起点近 + 离终点近”的格子，保证最短路径。
+
+## 测试
+bash
+cd mapping
+python3 -c "from planner.astar_planner import plan_random_start_goal; import numpy as np; grid = np.ones((100,100), dtype=np.uint8)*255; grid[50:60,40:80]=0; path = plan_random_start_goal(grid); print('Path length:', len(path))"
+
+## 常见问题
+**Q: 返回 None？**  
+A: 检查起点/终点是否被障碍物包围。
