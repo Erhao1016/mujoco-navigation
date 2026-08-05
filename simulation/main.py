@@ -1,13 +1,12 @@
-import mujoco
-import mujoco.viewer
-import time
-import sys
 import os
+import sys
+import time
+
+import mujoco.viewer
 
 
 # =====================================
 # 添加项目根目录到 Python 路径
-# 方便导入 controller
 # =====================================
 
 CURRENT_DIR = os.path.dirname(
@@ -18,175 +17,139 @@ PROJECT_ROOT = os.path.dirname(
     CURRENT_DIR
 )
 
-sys.path.append(PROJECT_ROOT)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(
+        0,
+        PROJECT_ROOT,
+    )
 
 
-from controller.controller import RobotController
-
+from navigation.navigation_core import NavigationCore
+from simulation.simulation_core import SimulationCore
 
 
 # =====================================
-# 加载 MuJoCo 世界
+# 导航参数
 # =====================================
 
+START_WORLD = (
+    0.0,
+    0.0,
+)
 
-MODEL_PATH = os.path.join(
-    CURRENT_DIR,
-    "world.xml"
+GOAL_WORLD = (
+    -2.0,
+    2.0,
 )
 
 
-model = mujoco.MjModel.from_xml_path(
-    MODEL_PATH
+# =====================================
+# 创建导航核心
+# =====================================
+
+navigation = NavigationCore(
+    waypoint_step=4,
+    kp=2.0,
+    kd=0.1,
+    max_speed=0.9,
+    reach_threshold=0.08,
 )
 
 
-data = mujoco.MjData(
-    model
+# =====================================
+# 创建仿真核心
+# =====================================
+
+simulation = SimulationCore()
+
+
+# =====================================
+# 规划路径
+# =====================================
+
+navigation.plan_path(
+    start_world=START_WORLD,
+    goal_world=GOAL_WORLD,
 )
 
 
-
 # =====================================
-# 创建机器人控制器
+# 输出场景信息
 # =====================================
 
-
-controller = RobotController(
-    model,
-    data
-)
-
+simulation.print_scene_information()
 
 
 # =====================================
-# Task3:
-# 输出场景物体
+# 启动仿真
 # =====================================
-
 
 print("\n==========================")
-print(" MuJoCo Navigation Demo ")
-print("==========================\n")
+print(" MuJoCo Navigation Demo")
+print("==========================")
+
+print(
+    f"Start: {START_WORLD}"
+)
+
+print(
+    f"Goal: {GOAL_WORLD}"
+)
+
+print(
+    "Simulation started..."
+)
 
 
-print("===== Scene Bodies =====")
-
-
-for i in range(model.nbody):
-
-    name = model.body(i).name
-
-    pos = model.body_pos[i]
-
-
-    print(
-        f"{name:<20}"
-        f"x={pos[0]:.2f}, "
-        f"y={pos[1]:.2f}, "
-        f"z={pos[2]:.2f}"
-    )
-
-
-
-print("========================\n")
-
-
-
-# =====================================
-# Task2:
-# 查看速度控制接口
-# =====================================
-
-
-print("===== Actuators =====")
-
-
-for i in range(model.nu):
-
-    print(
-        i,
-        model.actuator(i).name
-    )
-
-
-print("====================\n")
-
-
-
-
-# =====================================
-# 启动 MuJoCo Viewer
-# =====================================
+last_control_time = time.perf_counter()
 
 
 with mujoco.viewer.launch_passive(
-        model,
-        data
+    simulation.model,
+    simulation.data,
 ) as viewer:
-
-
-
-    print(
-        "Simulation started..."
-    )
-
 
     while viewer.is_running():
 
-
-
-        # =================================
-        # Task2:
-        # 设置机器人速度
-        #
-        # vx:
-        #   X方向速度
-        #
-        # vy:
-        #   Y方向速度
-        #
-        # wz:
-        #   Z轴旋转速度
-        # =================================
-
-
-        controller.set_velocity(
-            vx=0.5,
-            vy=0.0,
-            wz=0.3
+        current_position = (
+            simulation.get_robot_position()
         )
 
+        current_time = time.perf_counter()
 
-
-        # 写入 MuJoCo actuator
-
-        controller.update()
-
-
-
-        # 仿真推进
-
-        mujoco.mj_step(
-            model,
-            data
+        dt = (
+            current_time
+            - last_control_time
         )
 
+        last_control_time = current_time
 
+        vx, vy, wz = (
+            navigation.compute_command(
+                current_position=current_position,
+                dt=dt,
+            )
+        )
 
-        # 更新显示
+        simulation.set_velocity(
+            vx=vx,
+            vy=vy,
+            wz=wz,
+        )
+
+        simulation.step()
 
         viewer.sync()
 
-
-
-        # 控制刷新速度
+        if navigation.is_goal_reached():
+            simulation.stop()
 
         time.sleep(
             0.01
         )
 
 
+simulation.stop()
 
 print(
     "Simulation finished."
