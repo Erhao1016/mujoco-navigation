@@ -9,8 +9,8 @@ services:
       - ROS_DOMAIN_ID=5
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ./simulation:/workspace/simulation
-      - ./maps:/workspace/maps
+      - .:/workspace
+    command: ["bash", "-c", "source /opt/ros/jazzy/setup.bash && python3 ros2_nodes/simulation_node.py"]
     networks:
       - ros_network
     ipc: host
@@ -21,9 +21,8 @@ services:
     environment:
       - ROS_DOMAIN_ID=5
     volumes:
-      - ./planner:/workspace/planner
-      - ./controller:/workspace/controller
-      - ./maps:/workspace/maps
+      - .:/workspace
+    command: ["bash", "-c", "source /opt/ros/jazzy/setup.bash && python3 ros2_nodes/navigation_node.py"]
     depends_on:
       - mujoco_sim
     networks:
