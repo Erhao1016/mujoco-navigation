@@ -2,6 +2,7 @@ import os
 import sys
 
 import mujoco
+import numpy as np
 
 
 # =====================================
@@ -51,6 +52,10 @@ class SimulationCore:
         self,
         model_path: str | None = None,
         robot_body_name: str = "robot",
+        initial_position: tuple[
+            float,
+            float,
+        ] | None = None,
     ):
         if model_path is None:
             model_path = os.path.join(
@@ -83,6 +88,14 @@ class SimulationCore:
             self.model
         )
 
+        if initial_position is not None:
+            self.set_robot_pose(
+                x=initial_position[0],
+                y=initial_position[1],
+                yaw=0.0,
+                forward=False,
+            )
+
         # 计算初始状态
         mujoco.mj_forward(
             self.model,
@@ -104,6 +117,10 @@ class SimulationCore:
             )
         )
 
+        self.camera_name = "robot_camera"
+        self.camera_renderer = None
+        self.depth_renderer = None
+
         # 保存最近一次速度命令
         self.last_vx = 0.0
         self.last_vy = 0.0
@@ -118,6 +135,50 @@ class SimulationCore:
             f"Robot body: "
             f"{self.robot_body_name}"
         )
+
+    # =====================================
+    # 设置机器人位姿
+    # =====================================
+
+    def set_robot_pose(
+        self,
+        x: float,
+        y: float,
+        yaw: float = 0.0,
+        forward: bool = True,
+    ) -> None:
+        """
+        设置机器人初始位姿。
+
+        当前 robot.xml 使用 tx、ty、rz 三个关节：
+            tx 控制 x
+            ty 控制 y
+            rz 控制 yaw
+        """
+        joint_values = {
+            "tx": float(x),
+            "ty": float(y),
+            "rz": float(yaw),
+        }
+
+        for joint_name, value in joint_values.items():
+            joint_id = self.model.joint(
+                joint_name
+            ).id
+
+            qpos_address = self.model.jnt_qposadr[
+                joint_id
+            ]
+
+            self.data.qpos[
+                qpos_address
+            ] = value
+
+        if forward:
+            mujoco.mj_forward(
+                self.model,
+                self.data,
+            )
 
     # =====================================
     # 获取机器人位置
@@ -159,6 +220,175 @@ class SimulationCore:
             float(position[1]),
             float(position[2]),
         )
+
+    # =====================================
+    # 获取机器人朝向
+    # =====================================
+
+    def get_robot_yaw(
+        self,
+    ) -> float:
+        """
+        返回机器人绕 Z 轴的角度，单位为弧度。
+        """
+        joint_id = self.model.joint(
+            "rz"
+        ).id
+
+        qpos_address = self.model.jnt_qposadr[
+            joint_id
+        ]
+
+        return float(
+            self.data.qpos[
+                qpos_address
+            ]
+        )
+
+    def get_robot_pose_2d(
+        self,
+    ) -> tuple[float, float, float]:
+        """
+        返回机器人二维位姿：
+            (x, y, yaw)
+        """
+        x, y = self.get_robot_position()
+        yaw = self.get_robot_yaw()
+
+        return x, y, yaw
+
+    # =====================================
+    # 读取机器人摄像头
+    # =====================================
+
+    def get_camera_image(
+        self,
+        width: int = 320,
+        height: int = 240,
+    ):
+        """
+        返回机器人顶部摄像头的 RGB 图像。
+
+        图像格式是 numpy.ndarray，形状为：
+            (height, width, 3)
+        """
+        if self.camera_renderer is None:
+            self.camera_renderer = mujoco.Renderer(
+                self.model,
+                height=height,
+                width=width,
+            )
+
+        self.camera_renderer.update_scene(
+            self.data,
+            camera=self.camera_name,
+        )
+
+        return self.camera_renderer.render()
+
+    def get_camera_depth(
+        self,
+        width: int = 160,
+        height: int = 120,
+    ):
+        """
+        返回机器人顶部摄像头的深度图。
+
+        图像格式是 numpy.ndarray，形状为：
+            (height, width)
+        """
+        if self.depth_renderer is None:
+            self.depth_renderer = mujoco.Renderer(
+                self.model,
+                height=height,
+                width=width,
+            )
+
+            self.depth_renderer.enable_depth_rendering()
+
+        self.depth_renderer.update_scene(
+            self.data,
+            camera=self.camera_name,
+        )
+
+        return self.depth_renderer.render()
+
+    # =====================================
+    # 激光雷达式射线测距
+    # =====================================
+
+    def cast_navigation_rays(
+        self,
+        relative_angles: list[float],
+        max_distance: float = 5.0,
+        ray_height: float = 0.22,
+    ) -> list[float]:
+        """
+        从机器人附近向多个方向发射水平射线。
+
+        返回每条射线命中的距离；没有命中则返回 max_distance。
+        relative_angles 是相对机器人 yaw 的角度，单位为弧度。
+        """
+        x, y, yaw = self.get_robot_pose_2d()
+
+        ray_start = np.array(
+            [
+                x + 0.18 * np.cos(yaw),
+                y + 0.18 * np.sin(yaw),
+                ray_height,
+            ],
+            dtype=np.float64,
+        )
+
+        geom_group = np.ones(
+            6,
+            dtype=np.uint8,
+        )
+
+        distances = []
+
+        for relative_angle in relative_angles:
+            ray_angle = (
+                yaw
+                + float(relative_angle)
+            )
+
+            ray_direction = np.array(
+                [
+                    np.cos(ray_angle),
+                    np.sin(ray_angle),
+                    0.0,
+                ],
+                dtype=np.float64,
+            )
+
+            hit_geom_id = np.array(
+                [-1],
+                dtype=np.int32,
+            )
+
+            distance = mujoco.mj_ray(
+                self.model,
+                self.data,
+                ray_start,
+                ray_direction,
+                geom_group,
+                1,
+                self.robot_body_id,
+                hit_geom_id,
+            )
+
+            if distance < 0:
+                distance = max_distance
+
+            distances.append(
+                min(
+                    float(distance),
+                    max_distance,
+                )
+            )
+
+        return distances
 
     # =====================================
     # 设置速度

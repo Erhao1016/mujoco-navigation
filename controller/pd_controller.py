@@ -88,6 +88,7 @@ class PDController:
         current: tuple[float, float],
         target: tuple[float, float],
         dt: float,
+        current_yaw: float | None = None,
     ) -> tuple[float, float, float]:
         """
         根据当前位置和目标位置计算速度指令。
@@ -96,6 +97,7 @@ class PDController:
             current：机器人当前位置 (x, y)
             target：当前目标路径点 (x, y)
             dt：两次控制计算之间的时间，单位为秒
+            current_yaw：机器人当前朝向，单位为弧度
 
         返回：
             (vx, vy, wz)
@@ -134,7 +136,23 @@ class PDController:
             vx *= scale
             vy *= scale
 
-        # 当前阶段使用全向移动，不需要通过旋转后再前进
         wz = 0.0
+
+        if current_yaw is not None and speed > 0.01:
+            target_yaw = math.atan2(
+                vy,
+                vx,
+            )
+
+            yaw_error = math.atan2(
+                math.sin(target_yaw - current_yaw),
+                math.cos(target_yaw - current_yaw),
+            )
+
+            wz = 4.0 * yaw_error
+            wz = max(
+                -2.0,
+                min(2.0, wz),
+            )
 
         return vx, vy, wz

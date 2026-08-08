@@ -476,6 +476,7 @@ class NavigationCore:
             float
         ],
         dt: float,
+        current_yaw: float | None = None,
     ) -> tuple[
         float,
         float,
@@ -490,6 +491,9 @@ class NavigationCore:
 
             dt：
                 控制周期，单位为秒
+
+            current_yaw：
+                机器人当前朝向，单位为弧度。
 
         返回：
             vx、vy、wz
@@ -576,6 +580,7 @@ class NavigationCore:
                 current=current,
                 target=target,
                 dt=safe_dt,
+                current_yaw=current_yaw,
             )
         )
 
