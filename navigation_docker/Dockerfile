@@ -11,7 +11,7 @@ RUN apt update && apt install -y \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list \
     && apt update \
     && apt install -y ros-${ROS_DISTRO}-desktop ros-dev-tools python3-pip \
-    && pip3 install numpy pillow \
+    && pip3 install --break-system-packages numpy pillow \
     && rm -rf /var/lib/apt/lists/*
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
