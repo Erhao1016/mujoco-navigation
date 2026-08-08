@@ -29,7 +29,7 @@ if PROJECT_ROOT not in sys.path:
 # =====================================
 
 from controller.pd_controller import PDController
-from mapping.planner.astar_planner import astar
+from mapping.astar_planner import astar
 
 
 class NavigationCore:

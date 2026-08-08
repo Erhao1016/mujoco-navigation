@@ -6,7 +6,7 @@ import numpy as np
 import yaml
 from PIL import Image
 
-from mapping.planner.astar_planner import astar
+from mapping.astar_planner import astar
 
 
 CURRENT_DIR = os.path.dirname(
