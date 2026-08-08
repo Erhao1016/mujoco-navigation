@@ -99,7 +99,11 @@ def apply_lidar_collision_guard(
     """
     只做局部防碰撞，不改变 A* 路线。
 
-    A* 输出的速度仍是主命令；雷达只在非常近时介入。
+    A* 地图已按机器人半径 + 安全余量膨胀，路径本身无碰撞风险，
+    因此雷达只在极近距离做紧急干预，避免误拦可通行的窄间隙。
+
+    机器人为全向底盘（tx/ty 平移关节），避障以"侧向平移"为主：
+    原地旋转无法让全向机器人绕开障碍物，只会原地打转。
     """
     center_distance = lidar_status[
         "center"
@@ -113,41 +117,51 @@ def apply_lidar_collision_guard(
         "right"
     ]
 
-    if center_distance < 0.28:
-        turn_direction = (
-            1.0
-            if left_distance > right_distance
-            else -1.0
-        )
-
-        return (
-            0.0,
-            0.0,
-            1.4 * turn_direction,
-        )
-
     guarded_vx = vx
     guarded_vy = vy
     guarded_wz = wz
 
-    if center_distance < 0.45:
-        guarded_vx *= 0.35
-        guarded_vy *= 0.35
+    # 侧向平移避让：障碍贴到一侧时向相反侧平移（距离越近推得越猛）
+    push = 0.0
 
-    if left_distance < 0.18:
-        push_vx, push_vy = robot_to_world_velocity(
-            forward=0.0,
-            left=-0.35,
+    if left_distance < 0.22:
+        push -= 0.45 * (
+            1.0
+            - left_distance / 0.22
+        )
+
+    if right_distance < 0.22:
+        push += 0.45 * (
+            1.0
+            - right_distance / 0.22
+        )
+
+    # 前方真正贴近（小于机器人半径附近）才紧急减速
+    if center_distance < 0.17:
+        factor = max(
+            0.0,
+            (center_distance - 0.08)
+            / (0.17 - 0.08),
+        )
+
+        guarded_vx *= factor
+        guarded_vy *= factor
+
+    # 前向被彻底堵死且两侧都无法侧移：向后退尝试脱困
+    if center_distance < 0.12 and abs(push) < 0.1:
+        back_vx, back_vy = robot_to_world_velocity(
+            forward=-0.4,
+            left=0.0,
             yaw=current_yaw,
         )
 
-        guarded_vx += push_vx
-        guarded_vy += push_vy
+        guarded_vx += back_vx
+        guarded_vy += back_vy
 
-    if right_distance < 0.18:
+    if push != 0.0:
         push_vx, push_vy = robot_to_world_velocity(
             forward=0.0,
-            left=0.35,
+            left=push,
             yaw=current_yaw,
         )
 
