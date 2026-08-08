@@ -9,7 +9,6 @@ services:
       - ROS_DOMAIN_ID=5
       - PYTHONPATH=/workspace
     volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix
       - .:/workspace
     command: ["bash", "-c", "source /opt/ros/jazzy/setup.bash && python3 ros2_ws/src/mujoco_navigation/mujoco_navigation/simulation_node.py"]
     networks:
