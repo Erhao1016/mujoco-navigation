@@ -48,6 +48,12 @@
                 pos="0.15 0 0"
                 size="0.03"/>
 
+            <camera
+                name="robot_camera"
+                pos="0.22 0 0.50"
+                xyaxes="0 -1 0 0.35 0 0.94"
+                fovy="70"/>
+
 
         </body>
 
@@ -62,15 +68,15 @@
         <velocity
             name="vx"
             joint="tx"
-            ctrlrange="-1 1"
-            kv="200"/>
+            ctrlrange="-4.5 4.5"
+            kv="420"/>
 
 
         <velocity
             name="vy"
             joint="ty"
-            ctrlrange="-1 1"
-            kv="50"/>
+            ctrlrange="-4.5 4.5"
+            kv="240"/>
 
 
         <velocity

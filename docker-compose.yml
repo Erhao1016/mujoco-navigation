@@ -1,0 +1,35 @@
+version: '3'
+services:
+  mujoco_sim:
+    build: ./simulation_docker
+    container_name: mujoco_simulation
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=5
+      - PYTHONPATH=/workspace
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - .:/workspace
+    command: ["bash", "-c", "source /opt/ros/jazzy/setup.bash && python3 ros2_ws/src/mujoco_navigation/mujoco_navigation/simulation_node.py"]
+    networks:
+      - ros_network
+    ipc: host
+
+  navigation:
+    build: ./navigation_docker
+    container_name: navigation_stack
+    environment:
+      - ROS_DOMAIN_ID=5
+      - PYTHONPATH=/workspace
+    volumes:
+      - .:/workspace
+    command: ["bash", "-c", "source /opt/ros/jazzy/setup.bash && python3 ros2_ws/src/mujoco_navigation/mujoco_navigation/navigation_node.py"]
+    depends_on:
+      - mujoco_sim
+    networks:
+      - ros_network
+
+networks:
+  ros_network:
+    driver: bridge

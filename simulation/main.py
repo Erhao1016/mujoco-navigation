@@ -1,13 +1,13 @@
-import mujoco
-import mujoco.viewer
-import time
-import sys
 import os
+import sys
+import time
+import math
+
+import mujoco.viewer
 
 
 # =====================================
 # 添加项目根目录到 Python 路径
-# 方便导入 controller
 # =====================================
 
 CURRENT_DIR = os.path.dirname(
@@ -18,175 +18,340 @@ PROJECT_ROOT = os.path.dirname(
     CURRENT_DIR
 )
 
-sys.path.append(PROJECT_ROOT)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(
+        0,
+        PROJECT_ROOT,
+    )
 
 
-from controller.controller import RobotController
+from navigation.navigation_core import NavigationCore
+from simulation.random_environment import generate_random_environment
+from simulation.simulation_core import SimulationCore
 
+
+RAY_ANGLES = [
+    -math.pi / 2.0
+    + index * math.pi / 30.0
+    for index in range(31)
+]
+
+
+def build_lidar_status(
+    distances: list[float],
+) -> dict:
+    right_distances = [
+        distance
+        for angle, distance
+        in zip(RAY_ANGLES, distances)
+        if angle < -0.35
+    ]
+
+    center_distances = [
+        distance
+        for angle, distance
+        in zip(RAY_ANGLES, distances)
+        if -0.35 <= angle <= 0.35
+    ]
+
+    left_distances = [
+        distance
+        for angle, distance
+        in zip(RAY_ANGLES, distances)
+        if angle > 0.35
+    ]
+
+    return {
+        "right": min(right_distances),
+        "center": min(center_distances),
+        "left": min(left_distances),
+    }
+
+
+def robot_to_world_velocity(
+    forward: float,
+    left: float,
+    yaw: float,
+) -> tuple[float, float]:
+    cos_yaw = math.cos(
+        yaw
+    )
+
+    sin_yaw = math.sin(
+        yaw
+    )
+
+    return (
+        cos_yaw * forward
+        - sin_yaw * left,
+        sin_yaw * forward
+        + cos_yaw * left,
+    )
+
+
+def apply_lidar_collision_guard(
+    vx: float,
+    vy: float,
+    wz: float,
+    current_yaw: float,
+    lidar_status: dict,
+) -> tuple[float, float, float]:
+    """
+    只做局部防碰撞，不改变 A* 路线。
+
+    A* 地图已按机器人半径 + 安全余量膨胀，路径本身无碰撞风险，
+    因此雷达只在极近距离做紧急干预，避免误拦可通行的窄间隙。
+
+    机器人为全向底盘（tx/ty 平移关节），避障以"侧向平移"为主：
+    原地旋转无法让全向机器人绕开障碍物，只会原地打转。
+    """
+    center_distance = lidar_status[
+        "center"
+    ]
+
+    left_distance = lidar_status[
+        "left"
+    ]
+
+    right_distance = lidar_status[
+        "right"
+    ]
+
+    guarded_vx = vx
+    guarded_vy = vy
+    guarded_wz = wz
+
+    # 侧向平移避让：障碍贴到一侧时向相反侧平移（距离越近推得越猛）
+    push = 0.0
+
+    if left_distance < 0.22:
+        push -= 0.45 * (
+            1.0
+            - left_distance / 0.22
+        )
+
+    if right_distance < 0.22:
+        push += 0.45 * (
+            1.0
+            - right_distance / 0.22
+        )
+
+    # 前方真正贴近（小于机器人半径附近）才紧急减速
+    if center_distance < 0.17:
+        factor = max(
+            0.0,
+            (center_distance - 0.08)
+            / (0.17 - 0.08),
+        )
+
+        guarded_vx *= factor
+        guarded_vy *= factor
+
+    # 前向被彻底堵死且两侧都无法侧移：向后退尝试脱困
+    if center_distance < 0.12 and abs(push) < 0.1:
+        back_vx, back_vy = robot_to_world_velocity(
+            forward=-0.4,
+            left=0.0,
+            yaw=current_yaw,
+        )
+
+        guarded_vx += back_vx
+        guarded_vy += back_vy
+
+    if push != 0.0:
+        push_vx, push_vy = robot_to_world_velocity(
+            forward=0.0,
+            left=push,
+            yaw=current_yaw,
+        )
+
+        guarded_vx += push_vx
+        guarded_vy += push_vy
+
+    return guarded_vx, guarded_vy, guarded_wz
 
 
 # =====================================
-# 加载 MuJoCo 世界
+# 随机生成环境
 # =====================================
 
+environment = generate_random_environment(
+    obstacle_count=16,
+)
 
-MODEL_PATH = os.path.join(
-    CURRENT_DIR,
-    "world.xml"
+START_WORLD = environment[
+    "start_world"
+]
+
+GOAL_WORLD = environment[
+    "goal_world"
+]
+
+WORLD_PATH = environment[
+    "world_path"
+]
+
+MAP_PATH = environment[
+    "map_path"
+]
+
+OBSTACLES = environment[
+    "obstacles"
+]
+
+print("\n===== Random Environment =====")
+
+print(
+    f"World: {WORLD_PATH}"
+)
+
+print(
+    f"Map: {MAP_PATH}"
+)
+
+for obstacle in OBSTACLES:
+    print(
+        f"{obstacle['name']:<20}"
+        f"position=({obstacle['x']:.2f}, "
+        f"{obstacle['y']:.2f})  "
+        f"half_size=({obstacle['half_size_x']:.2f}, "
+        f"{obstacle['half_size_y']:.2f})"
+    )
+
+print(
+    "==============================\n"
 )
 
 
-model = mujoco.MjModel.from_xml_path(
-    MODEL_PATH
+# =====================================
+# 创建 A* 导航核心
+# =====================================
+
+navigation = NavigationCore(
+    map_path=MAP_PATH,
+    waypoint_step=4,
+    kp=5.0,
+    kd=0.15,
+    max_speed=4.0,
+    reach_threshold=0.14,
+)
+
+navigation.plan_path(
+    start_world=START_WORLD,
+    goal_world=GOAL_WORLD,
 )
 
 
-data = mujoco.MjData(
-    model
+# =====================================
+# 创建仿真核心
+# =====================================
+
+simulation = SimulationCore(
+    model_path=WORLD_PATH,
+    initial_position=START_WORLD,
 )
 
 
-
 # =====================================
-# 创建机器人控制器
+# 输出场景信息
 # =====================================
 
-
-controller = RobotController(
-    model,
-    data
-)
-
+simulation.print_scene_information()
 
 
 # =====================================
-# Task3:
-# 输出场景物体
+# 启动仿真
 # =====================================
-
 
 print("\n==========================")
-print(" MuJoCo Navigation Demo ")
-print("==========================\n")
+print(" MuJoCo Navigation Demo")
+print("==========================")
+
+print(
+    f"Start: {START_WORLD}"
+)
+
+print(
+    f"Goal: {GOAL_WORLD}"
+)
+
+print(
+    "Simulation started in A* path-following mode with lidar collision guard..."
+)
 
 
-print("===== Scene Bodies =====")
-
-
-for i in range(model.nbody):
-
-    name = model.body(i).name
-
-    pos = model.body_pos[i]
-
-
-    print(
-        f"{name:<20}"
-        f"x={pos[0]:.2f}, "
-        f"y={pos[1]:.2f}, "
-        f"z={pos[2]:.2f}"
-    )
-
-
-
-print("========================\n")
-
-
-
-# =====================================
-# Task2:
-# 查看速度控制接口
-# =====================================
-
-
-print("===== Actuators =====")
-
-
-for i in range(model.nu):
-
-    print(
-        i,
-        model.actuator(i).name
-    )
-
-
-print("====================\n")
-
-
-
-
-# =====================================
-# 启动 MuJoCo Viewer
-# =====================================
+last_control_time = time.perf_counter()
 
 
 with mujoco.viewer.launch_passive(
-        model,
-        data
+    simulation.model,
+    simulation.data,
 ) as viewer:
-
-
-
-    print(
-        "Simulation started..."
-    )
-
 
     while viewer.is_running():
 
-
-
-        # =================================
-        # Task2:
-        # 设置机器人速度
-        #
-        # vx:
-        #   X方向速度
-        #
-        # vy:
-        #   Y方向速度
-        #
-        # wz:
-        #   Z轴旋转速度
-        # =================================
-
-
-        controller.set_velocity(
-            vx=0.5,
-            vy=0.0,
-            wz=0.3
+        current_x, current_y, current_yaw = (
+            simulation.get_robot_pose_2d()
         )
 
-
-
-        # 写入 MuJoCo actuator
-
-        controller.update()
-
-
-
-        # 仿真推进
-
-        mujoco.mj_step(
-            model,
-            data
+        current_position = (
+            current_x,
+            current_y,
         )
 
+        current_time = time.perf_counter()
 
+        dt = (
+            current_time
+            - last_control_time
+        )
 
-        # 更新显示
+        last_control_time = current_time
+
+        vx, vy, wz = (
+            navigation.compute_command(
+                current_position=current_position,
+                dt=dt,
+                current_yaw=current_yaw,
+            )
+        )
+
+        lidar_distances = simulation.cast_navigation_rays(
+            relative_angles=RAY_ANGLES,
+            max_distance=5.0,
+        )
+
+        lidar_status = build_lidar_status(
+            lidar_distances
+        )
+
+        vx, vy, wz = apply_lidar_collision_guard(
+            vx=vx,
+            vy=vy,
+            wz=wz,
+            current_yaw=current_yaw,
+            lidar_status=lidar_status,
+        )
+
+        simulation.set_velocity(
+            vx=vx,
+            vy=vy,
+            wz=wz,
+        )
+
+        simulation.step()
 
         viewer.sync()
 
-
-
-        # 控制刷新速度
+        if navigation.is_goal_reached():
+            simulation.stop()
 
         time.sleep(
             0.01
         )
 
 
+simulation.stop()
 
 print(
     "Simulation finished."
