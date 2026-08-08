@@ -11,8 +11,8 @@ RUN apt update && apt install -y \
     && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" > /etc/apt/sources.list.d/ros2.list \
     && apt update \
-    && apt install -y ros-${ROS_DISTRO}-desktop ros-dev-tools \
-    && apt install -y libgl1-mesa-glx libglib2.0-0 libsm6 libice6 libxrender1 libxkbcommon-x11-0 libdbus-1-3 \
+    && apt install -y ros-${ROS_DISTRO}-ros-base ros-${ROS_DISTRO}-geometry-msgs ros-${ROS_DISTRO}-nav-msgs ros-dev-tools \
+    && apt install -y libgl1 libglib2.0-0 libsm6 libice6 libxrender1 libxkbcommon-x11-0 libdbus-1-3 \
     && pip3 install --break-system-packages mujoco \
     && rm -rf /var/lib/apt/lists/*
 
